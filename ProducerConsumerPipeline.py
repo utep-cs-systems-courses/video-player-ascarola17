@@ -52,7 +52,7 @@ def extractor():
         buffer1.append(frame)
         #release the lock so it can be used again 
         buffer1_mutex.release()
-        #Adds to the full counter 
+        #Signals that buffer1 now has a new frame available for the converter
         buffer1_full.release()
         
         #Just to keep track of the frames proccessed 
@@ -84,7 +84,7 @@ def converter():
         buffer1_empty.release()
 
         #change the frame from raw color to the grey scale
-        gray = frame
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         #see if theres room in buffer 2 to give new converted frame 
         buffer2_empty.acquire()
