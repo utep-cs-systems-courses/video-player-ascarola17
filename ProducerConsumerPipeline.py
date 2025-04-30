@@ -63,6 +63,18 @@ def extractor():
     #release the video
     vid.release()
 
+    #To process all frames (Stop at last frame without using max frames)
+    #wait for space in buffer1
+    buffer1_empty.acquire()
+    #lock the buffer
+    buffer1_mutex.acquire()
+    #send none so its known the extractor is done sending frames
+    buffer1.append(None)
+    #relase the lock
+    buffer1_mutex.release()
+    #Singal converter new item is ready (None)
+    buffer1_full.release()
+
 
 def converter():
     #print("convertor")
@@ -71,7 +83,8 @@ def converter():
     #Just have a set of max frames for now can techinally go forever testing since cv2.show not working
     MAX_FRAMES = 30
     #Go while we havent reached the max frames
-    while count < MAX_FRAMES:
+    #while count < MAX_FRAMES:
+    while True:
         #see if theres something in buffer and grab it 
         buffer1_full.acquire()
         #lock the buffer so it cant be touched by anything else
@@ -83,6 +96,20 @@ def converter():
         #nofify theres empty space and can add another frame
         buffer1_empty.release()
 
+        #If we have got all the frames (extractor is done)
+        if frame is None:
+            #wait for space in buffer2 to give stop singal
+            buffer2_empty.acquire()
+            #lock the buffer to put in stop
+            buffer2_mutex.acquire()
+            #pass the stop signal
+            buffer2.append(None)
+            #relase the lock 
+            buffer2_mutex.release()
+            #let displayer know theres something ready (Stop signal)
+            buffer2_full.release()
+            #stop
+            break
         #change the frame from raw color to the grey scale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -107,7 +134,8 @@ def displayer():
     MAX_FRAMES = 30
 
     #Go until we reach the max frames 
-    while count < MAX_FRAMES:
+    #while count < MAX_FRAMES:
+    while True:
         #see if theres at least 1 frame in buffer 2
         buffer2_full.acquire()
         #lock the buffer 
@@ -121,10 +149,11 @@ def displayer():
 
         #Error check : something went wrong like a frame is none 
         if frame is None:
-            print(f"[Displayer] Skipping invalid frame {count}")
-            continue
+            print("[Displayer] Received stop signal. Shutting down.")
+            break
 
-        # CV2 NOT WORKING 
+
+        # CV2.show NOT WORKING 
         # try:
         #     #Display the frame
         #     cv2.imshow("Video", frame)
